@@ -141,6 +141,7 @@ async function doImport(req, res, padId)
   let fileIsHTML = (fileEnding === ".html" || fileEnding === ".htm");
   let fileIsTXT = (fileEnding === ".txt");
 
+  let directDatabaseAccess = false;
   if (fileIsEtherpad) {
     // we do this here so we can see if the pad has quite a few edits
     let _pad = await padManager.getPad(padId);
@@ -153,12 +154,12 @@ async function doImport(req, res, padId)
 
     const fsp_readFile = util.promisify(fs.readFile);
     let _text = await fsp_readFile(srcFile, "utf8");
-    req.directDatabaseAccess = true;
+    directDatabaseAccess = true;
     await importEtherpad.setPadRaw(padId, _text);
   }
 
   // convert file to html if necessary
-  if (!importHandledByPlugin && !req.directDatabaseAccess) {
+  if (!importHandledByPlugin && !directDatabaseAccess) {
     if (fileIsTXT) {
       // Don't use convertor for text files
       useConvertor = false;
@@ -183,7 +184,7 @@ async function doImport(req, res, padId)
     }
   }
 
-  if (!useConvertor && !req.directDatabaseAccess) {
+  if (!useConvertor && !directDatabaseAccess) {
     // Read the file with no encoding for raw buffer access.
     let buf = await fsp_readFile(destFile);
 
@@ -201,7 +202,7 @@ async function doImport(req, res, padId)
   // read the text
   let text;
 
-  if (!req.directDatabaseAccess) {
+  if (!directDatabaseAccess) {
     text = await fsp_readFile(destFile, "utf8");
 
     /*
@@ -223,7 +224,7 @@ async function doImport(req, res, padId)
   }
 
   // change text of the pad and broadcast the changeset
-  if (!req.directDatabaseAccess) {
+  if (!directDatabaseAccess) {
     if (importHandledByPlugin || useConvertor || fileIsHTML) {
       try {
         await importHtml.setPadHTML(pad, text);
@@ -242,9 +243,7 @@ async function doImport(req, res, padId)
 
   // direct Database Access means a pad user should perform a switchToPad
   // and not attempt to receive updated pad data
-  if (req.directDatabaseAccess) {
-    return;
-  }
+  if (directDatabaseAccess) return true;
 
   // tell clients to update
   await padMessageHandler.updatePadClients(pad);
@@ -263,29 +262,31 @@ async function doImport(req, res, padId)
   if (await fsp_exists(destFile)) {
     fsp_unlink(destFile);
   }
+
+  return false;
 }
 
-exports.doImport = function (req, res, padId)
-{
-  /**
-   * NB: abuse the 'req' object by storing an additional
-   * 'directDatabaseAccess' property on it so that it can
-   * be passed back in the HTML below.
-   *
-   * this is necessary because in the 'throw' paths of
-   * the function above there's no other way to return
-   * a value to the caller.
-   */
-  let status = "ok";
-  doImport(req, res, padId).catch(err => {
-    // check for known errors and replace the status
-    if (err == "uploadFailed" || err == "convertFailed" || err == "padHasData" || err == "maxFileSize") {
-      status = err;
-    } else {
-      throw err;
-    }
-  }).then(() => {
-    // close the connection
-    res.send("<script>document.addEventListener('DOMContentLoaded', function(){ var impexp = window.parent.padimpexp.handleFrameCall('" + req.directDatabaseAccess +"', '" + status + "'); })</script>");
-  });
-}
+const knownErrors = [
+  'uploadFailed',
+  'convertFailed',
+  'padHasData',
+  'maxFileSize',
+];
+
+exports.doImport = async (req, res, padId) => {
+  let status = 'ok';
+  let directDatabaseAccess;
+  try {
+    directDatabaseAccess = await doImport(req, res, padId);
+  } catch (err) {
+    if (knownErrors.indexOf(err) === -1) throw err;
+    status = err;
+  }
+  // close the connection
+  res.send('<script>' +
+           "  document.addEventListener('DOMContentLoaded', function() {"+
+           '    var impexp = window.parent.padimpexp.handleFrameCall(' +
+           `        '${directDatabaseAccess}', '${status}');` +
+           '  });' +
+           '</script>');
+};
