@@ -33,6 +33,8 @@ var padManager = require("../db/PadManager")
   , hooks = require("ep_etherpad-lite/static/js/pluginfw/hooks.js")
   , util = require("util");
 
+const logger = log4js.getLogger('ImportHandler');
+
 let fsp_exists = util.promisify(fs.exists);
 let fsp_rename = util.promisify(fs.rename);
 let fsp_readFile = util.promisify(fs.readFile);
@@ -59,8 +61,6 @@ const tmpDirectory = os.tmpdir();
  */
 async function doImport(req, res, padId)
 {
-  var apiLogger = log4js.getLogger("ImportHandler");
-
   // pipe to a file
   // convert file to html via abiword or soffice
   // set html in the pad
@@ -148,7 +148,7 @@ async function doImport(req, res, padId)
     let headCount = _pad.head;
 
     if (headCount >= 10) {
-      apiLogger.warn("Direct database Import attempt of a pad that already has content, we won't be doing this");
+      logger.warn("Direct database Import attempt of a pad that already has content, we won't be doing this");
       throw "padHasData";
     }
 
@@ -229,7 +229,7 @@ async function doImport(req, res, padId)
       try {
         await importHtml.setPadHTML(pad, text);
       } catch (e) {
-        apiLogger.warn("Error importing, possibly caused by malformed HTML");
+        logger.warn("Error importing, possibly caused by malformed HTML");
       }
     } else {
       await pad.setText(text);
@@ -274,19 +274,18 @@ const knownErrors = [
 ];
 
 exports.doImport = async (req, res, padId) => {
-  let status = 'ok';
+  let httpStatus = 200;
+  let code = 0;
+  let message = 'ok';
   let directDatabaseAccess;
   try {
     directDatabaseAccess = await doImport(req, res, padId);
   } catch (err) {
-    if (knownErrors.indexOf(err) === -1) throw err;
-    status = err;
+    const known = knownErrors.indexOf(err) !== -1;
+    if (!known) logger.error('Internal error during import:', err.stack ? err.stack : err);
+    httpStatus = known ? 400 : 500;
+    code = known ? 1 : 2;
+    message = known ? err : 'internalError';
   }
-  // close the connection
-  res.send('<script>' +
-           "  document.addEventListener('DOMContentLoaded', function() {"+
-           '    var impexp = window.parent.padimpexp.handleFrameCall(' +
-           `        '${directDatabaseAccess}', '${status}');` +
-           '  });' +
-           '</script>');
+  res.status(httpStatus).json({code, message, data: {directDatabaseAccess}});
 };

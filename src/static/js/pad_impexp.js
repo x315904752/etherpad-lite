@@ -20,12 +20,12 @@
  * limitations under the License.
  */
 
+/* global $, FormData, clientVars, exports, html10n */
+
 var padimpexp = (function()
 {
 
   ///// import
-  var currentImportTimer = null;
-
   function addImportFrames()
   {
     $("#import .importframe").remove();
@@ -41,59 +41,48 @@ var padimpexp = (function()
     $('#importmessagefail').fadeOut('fast');
   }
 
-  function fileInputSubmit()
-  {
-    $('#importmessagefail').fadeOut("fast");
-    var ret = window.confirm(html10n.get("pad.impexp.confirmimport"));
-    if (ret)
-    {
-      currentImportTimer = window.setTimeout(function()
-      {
-        if (!currentImportTimer)
-        {
-          return;
-        }
-        currentImportTimer = null;
-        importErrorMessage("Request timed out.");
-        importDone();
-      }, 25000); // time out after some number of seconds
-      $('#importsubmitinput').attr(
-      {
-        disabled: true
-      }).val(html10n.get("pad.impexp.importing"));
+  async function fileInputSubmit(e) {
+    $('#importmessagefail').fadeOut('fast');
 
-      window.setTimeout(function()
-      {
-        $('#importfileinput').attr(
-        {
-          disabled: true
-        });
-      }, 0);
-      $('#importarrow').stop(true, true).hide();
-      $('#importstatusball').show();
+    if (!window.confirm(html10n.get('pad.impexp.confirmimport'))) return false;
+
+    e.preventDefault();
+
+    $('#importsubmitinput').attr({disabled: true}).val(html10n.get('pad.impexp.importing'));
+    window.setTimeout(() => $('#importfileinput').attr({disabled: true}), 0);
+    $('#importarrow').stop(true, true).hide();
+    $('#importstatusball').show();
+
+    const xhr = $.ajax({
+      url: window.location.href.split('?')[0].split('#')[0] + '/import',
+      method: 'POST',
+      data: new FormData(this),
+      processData: false,
+      contentType: false,
+      dataType: 'json',
+      timeout: 25000,
+    });
+
+    const {code, message, data: {directDatabaseAccess} = {}} = await (async () => {
+      try {
+        return await xhr;
+      } catch (err) {
+        if (err.responseJSON) return err.responseJSON;
+        return {code: 2, message: 'Unknown import error'};
+      }
+    })();
+
+    if (code !== 0) {
+      importErrorMessage(message);
+    } else {
+      $('#import_export').removeClass('popup-show');
+      if (directDatabaseAccess) pad.switchToPad(clientVars.padId);
     }
-    return ret;
-  }
 
-  function importDone()
-  {
-    $('#importsubmitinput').removeAttr('disabled').val(html10n.get("pad.impexp.importbutton"));
-    window.setTimeout(function()
-    {
-      $('#importfileinput').removeAttr('disabled');
-    }, 0);
+    $('#importsubmitinput').removeAttr('disabled').val(html10n.get('pad.impexp.importbutton'));
+    window.setTimeout(() => $('#importfileinput').removeAttr('disabled'), 0);
     $('#importstatusball').hide();
-    importClearTimeout();
     addImportFrames();
-  }
-
-  function importClearTimeout()
-  {
-    if (currentImportTimer)
-    {
-      window.clearTimeout(currentImportTimer);
-      currentImportTimer = null;
-    }
   }
 
   function importErrorMessage(status)
@@ -166,8 +155,6 @@ var padimpexp = (function()
       //get /p/padname
       // if /p/ isn't available due to a rewrite we use the clientVars padId
       var pad_root_path = new RegExp(/.*\/p\/[^\/]+/).exec(document.location.pathname) || clientVars.padId;
-      //get http://example.com/p/padname without Params
-      var pad_root_url = document.location.protocol + '//' + document.location.host + document.location.pathname;
 
       //i10l buttom import
       $('#importsubmitinput').val(html10n.get("pad.impexp.importbutton"));
@@ -179,9 +166,6 @@ var padimpexp = (function()
       $("#exporthtmla").attr("href", pad_root_path + "/export/html");
       $("#exportetherpada").attr("href", pad_root_path + "/export/etherpad");
       $("#exportplaina").attr("href", pad_root_path + "/export/txt");
-
-      // activate action to import in the form
-      $("#importform").attr('action', pad_root_url + "/import");
 
       //hide stuff thats not avaible if abiword/soffice is disabled
       if(clientVars.exportAvailable == "no")
@@ -213,26 +197,6 @@ var padimpexp = (function()
       $("#importfileinput").change(fileInputUpdated);
       $('#importform').unbind("submit").submit(fileInputSubmit);
       $('.disabledexport').click(cantExport);
-    },
-    handleFrameCall: function(directDatabaseAccess, status)
-    {
-      if(directDatabaseAccess === "undefined") directDatabaseAccess = false;
-      if (status !== "ok")
-      {
-        importErrorMessage(status);
-      }
-      else
-      {
-        $('#import_export').removeClass('popup-show');
-      }
-
-      if (directDatabaseAccess) {
-        // Switch to the pad without redrawing the page
-        pad.switchToPad(clientVars.padId);
-        $('#import_export').removeClass('popup-show');
-      }
-
-      importDone();
     },
     disable: function()
     {
