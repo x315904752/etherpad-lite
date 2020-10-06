@@ -54,7 +54,7 @@ var padimpexp = (function()
           return;
         }
         currentImportTimer = null;
-        importFailed("Request timed out.");
+        importErrorMessage("Request timed out.");
         importDone();
       }, 25000); // time out after some number of seconds
       $('#importsubmitinput').attr(
@@ -73,11 +73,6 @@ var padimpexp = (function()
       $('#importstatusball').show();
     }
     return ret;
-  }
-
-  function importFailed(msg)
-  {
-    importErrorMessage(msg);
   }
 
   function importDone()
@@ -224,7 +219,7 @@ var padimpexp = (function()
       if(directDatabaseAccess === "undefined") directDatabaseAccess = false;
       if (status !== "ok")
       {
-        importFailed(status);
+        importErrorMessage(status);
       }
       else
       {
