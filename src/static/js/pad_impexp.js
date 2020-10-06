@@ -136,29 +136,6 @@ var padimpexp = (function()
     }
   }
 
-  function importSuccessful(token)
-  {
-    $.ajax(
-    {
-      type: 'post',
-      url: '/ep/pad/impexp/import2',
-      data: {
-        token: token,
-        padId: pad.getPadId()
-      },
-      success: importApplicationSuccessful,
-      error: importApplicationFailed,
-      timeout: 25000
-    });
-    addImportFrames();
-  }
-
-  function importApplicationFailed(xhr, textStatus, errorThrown)
-  {
-    importErrorMessage("Error during conversion.");
-    importDone();
-  }
-
   ///// export
 
   function cantExport()

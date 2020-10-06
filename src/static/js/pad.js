@@ -842,11 +842,6 @@ var pad = {
     $('form#reconnectform input.missedChanges').val(JSON.stringify(pad.collabClient.getMissedChanges()));
     $('form#reconnectform').submit();
   },
-  // this is called from code put into a frame from the server:
-  handleImportExportFrameCall: function(callName, varargs)
-  {
-    padimpexp.handleFrameCall.call(padimpexp, callName, Array.prototype.slice.call(arguments, 1));
-  },
   callWhenNotCommitting: function(f)
   {
     pad.collabClient.callWhenNotCommitting(f);
