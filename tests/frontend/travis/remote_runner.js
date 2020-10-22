@@ -6,7 +6,9 @@ let getStatusInterval;
 let timeout;
 let allTestsPassed = true;
 
-let testSettings = {"browserName":"chrome", "platformName":"Windows 10", "browserVersion":"latest"}
+//let testSettings = {"browserName":"chrome", "platformName":"Windows 10", "browserVersion":"latest"}
+let testSettings = {"browserName":"microsoftedge", "platformName":"Windows 10", "browserVersion":"83.0"}
+//let testSettings = {"browserName":"safari", "platformName":"OS X 10.15, "browserVersion":"13.1"}
 let name = `${process.env.GIT_HASH} - ${testSettings.browserName} ${testSettings.browserVersion} ${testSettings.platformName}`;
 
 runTest(testSettings)
