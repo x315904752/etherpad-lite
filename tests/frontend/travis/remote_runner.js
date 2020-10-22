@@ -6,14 +6,19 @@ let getStatusInterval;
 let timeout;
 let allTestsPassed = true;
 
-//let testSettings = {"browserName":"chrome", "platformName":"Windows 10", "browserVersion":"latest"}
-let testSettings = {"browserName":"microsoftedge", "platformName":"Windows 10", "browserVersion":"83.0"}
-//let testSettings = {"browserName":"safari", "platformName":"OS X 10.15, "browserVersion":"13.1"}
-let name = `${process.env.GIT_HASH} - ${testSettings.browserName} ${testSettings.browserVersion} ${testSettings.platformName}`;
+let testSettings1 = {"browserName":"chrome", "platformName":"Windows 10", "browserVersion":"latest"}
+let testSettings2 = {"browserName":"microsoftedge", "platformName":"Windows 10", "browserVersion":"83.0"}
+let testSettings3 = {"browserName":"safari", "platformName":"OS X 10.15", "browserVersion":"13.1"}
 
-runTest(testSettings)
+let p1 = runTest(testSettings1)
+let p2 = runTest(testSettings2)
+let p3 = runTest(testSettings3)
+Promise.all([p1,p2,p3]).then(() => {
+  process.exit(allTestsPassed ? 0 : 1);
+}).catch(() => {console.log("problem during exit")})
 
 async function runTest(testSettings){
+  let name = `${process.env.GIT_HASH} - ${testSettings.browserName} ${testSettings.browserVersion} ${testSettings.platformName}`;
   driver = await new Builder().withCapabilities({
     'browserName': testSettings.browserName,
     'platformName': testSettings.platformName,
@@ -37,7 +42,7 @@ async function runTest(testSettings){
   session = session.id_;
   console.log(`https://saucelabs.com/jobs/${session}`);
 
-  driver.get(baseUrl).then(function(){
+  return driver.get(baseUrl).then(function(){
     getStatusInterval = setInterval(function(){
       driver.executeScript("return $('#console').text()")
         .then(function(knownConsoleText){
@@ -89,7 +94,6 @@ async function runTest(testSettings){
     console.log(`Remote sauce test ${name} finished! https://saucelabs.com/jobs/${session}`);
 
     await driver.quit();
-    process.exit(allTestsPassed ? 0 : 1);
   }
     return
   }).catch(function(err){console.log(`error while running the tests ${err}`)})
